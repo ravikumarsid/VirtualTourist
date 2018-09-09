@@ -1,0 +1,24 @@
+PODS:
+  - HGPlaceholders (0.3.0)
+  - OAuthSwift (1.2.0)
+  - SwiftGifOrigin (1.6.1)
+
+DEPENDENCIES:
+  - HGPlaceholders
+  - OAuthSwift (~> 1.2.0)
+  - SwiftGifOrigin (~> 1.6.1)
+
+SPEC REPOS:
+  https://github.com/CocoaPods/Specs.git:
+    - HGPlaceholders
+    - OAuthSwift
+    - SwiftGifOrigin
+
+SPEC CHECKSUMS:
+  HGPlaceholders: 2df01c51b04a30acd0b8c9c7161c7cdde4541109
+  OAuthSwift: 7fd6855b8e4d58eb5a30d156ea9bed7a8aecd1ca
+  SwiftGifOrigin: d6679d3ebe9df2e049a84bc52582635107b581f6
+
+PODFILE CHECKSUM: 27cd467e6ab30f817a37d886304130c6ed2c551c
+
+COCOAPODS: 1.5.0

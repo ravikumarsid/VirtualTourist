@@ -28,17 +28,19 @@ struct FlickrParameterKeys {
     static let Text = "text"
     static let BoundingBox = "bbox"
     static let Page = "page"
+    static let PerPage = "per_page"
 }
 
 struct FlickrParameterValues {
     static let SearchMethod = "flickr.photos.search"
-    static let APIKey = "b2809678e4fe6f56378acbb2c8b0c5b3"
+    static let APIKey = "5c209d92a5d6619c75fd051160022277"
     static let ResponseFormat = "json"
     static let DisableJSONCallback = "1"
     static let GalleryPhotosMethod = "flickr.galleries.getPhotos"
     static let GalleryID = "5704-72157622566655097"
     static let MediumURL = "url_m"
     static let UseSafeSearch = "1"
+    static let PerPage = "21"
 }
 
 
@@ -50,6 +52,12 @@ struct FlickrResponseKeys {
     static let MediumURL = "url_m"
     static let Pages = "pages"
     static let Total = "total"
+    
+    static let PhotoID = "id"
+    static let PhotoSecret = "secret"
+    static let PhotoServer = "server"
+    static let PhotoFarm = "farm"
+    
 }
 
 struct FlickrResponseValues {

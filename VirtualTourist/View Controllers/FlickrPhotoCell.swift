@@ -7,7 +7,30 @@
 //
 
 import UIKit
+import SwiftGifOrigin
 
-class MyCollectionViewCell: UICollectionViewCell {
-    @IBOutlet weak var myLabel: UILabel!
+class FlickrPhotoCell: UICollectionViewCell {
+    @IBOutlet weak var imageView: UIImageView!
+    
+    override var isSelected: Bool {
+        didSet {
+            if isSelected {
+                self.imageView.alpha = 0.30
+                self.isHighlighted = true
+            } else {
+                self.imageView.alpha = 1.0
+                self.isHighlighted = false
+            }
+        }
+    }
+    
+    lazy var activityIndicator: UIActivityIndicatorView = {
+        let activityIndicator = UIActivityIndicatorView(activityIndicatorStyle: .whiteLarge)
+        activityIndicator.hidesWhenStopped = true
+        activityIndicator.center = contentView.center
+        contentView.addSubview(activityIndicator)
+        return activityIndicator
+    }()
+    
 }
+

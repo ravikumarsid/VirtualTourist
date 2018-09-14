@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="14133" systemVersion="17G65" minimumToolsVersion="Automatic" sourceLanguage="Swift" userDefinedModelVersionIdentifier="VirtualTourist">
+<model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="14315.18" systemVersion="17G65" minimumToolsVersion="Automatic" sourceLanguage="Swift" userDefinedModelVersionIdentifier="VirtualTourist">
     <entity name="PhotoThumbnail" representedClassName="PhotoThumbnail" syncable="YES" codeGenerationType="class">
+        <attribute name="creationDate" optional="YES" attributeType="Date" usesScalarValueType="NO" syncable="YES"/>
         <attribute name="imageData" optional="YES" attributeType="Binary" allowsExternalBinaryDataStorage="YES" syncable="YES"/>
         <relationship name="pin" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Pin" inverseName="photos" inverseEntity="Pin" syncable="YES"/>
     </entity>
@@ -10,7 +11,7 @@
         <relationship name="photos" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="PhotoThumbnail" inverseName="pin" inverseEntity="PhotoThumbnail" syncable="YES"/>
     </entity>
     <elements>
-        <element name="PhotoThumbnail" positionX="1089" positionY="1116" width="128" height="73"/>
+        <element name="PhotoThumbnail" positionX="1089" positionY="1116" width="128" height="90"/>
         <element name="Pin" positionX="864" positionY="1100" width="128" height="88"/>
     </elements>
 </model>

@@ -51,13 +51,6 @@ class TravelLocationsMapVC: UIViewController, MKMapViewDelegate {
         
         self.mapView.addGestureRecognizer(uiLongPress)
         
-//        print("Current Region center lat is: \(self.mapView.region.center.latitude)")
-//        print("Current Region center longis: \(self.mapView.region.center.longitude)")
-//
-//        print("Current span center lat is: \(self.mapView.region.span.latitudeDelta)")
-//        print("Current span center longis: \(self.mapView.region.span.longitudeDelta)")
-        
-      
     }
     
     override func viewWillAppear(_ animated: Bool) {
@@ -82,27 +75,23 @@ class TravelLocationsMapVC: UIViewController, MKMapViewDelegate {
             pin.latitude = coordinate?.latitude.description
             pin.longitude = coordinate?.longitude.description
             
-            print("Latitude and Longitude are: \(String(describing: coordinate?.latitude.description)) and \(String(describing: coordinate?.longitude.description))")
-            
             pinsLocations = pinsLocations.filter { $0.latitude != pin.latitude && $0.longitude != pin.longitude}
             
             print(pinsLocations)
-
+            
             let fetchRequest:NSFetchRequest<Pin> = Pin.fetchRequest()
             if let result = try? dataController.viewContext.fetch(fetchRequest) {
                 for p in result {
                     if (p.latitude == pin.latitude) && (p.longitude == pin.longitude){
-
+                        
                         dataController.viewContext.delete(p)
                     }
                 }
             }
-  
+            
             try? dataController.viewContext.save()
             self.mapView.removeAnnotation(view.annotation!)
-            
-            
-            
+        
         } else {
             let coordinate = view.annotation?.coordinate
             selectedLatitude = coordinate?.latitude.description
@@ -113,7 +102,7 @@ class TravelLocationsMapVC: UIViewController, MKMapViewDelegate {
             if let result = try? dataController.viewContext.fetch(fetchRequest) {
                 for p in result {
                     if (p.latitude == selectedLatitude) && (p.longitude == selectedLongitude){
-
+                        
                         nextVCPin = p
                     }
                 }
@@ -156,9 +145,7 @@ class TravelLocationsMapVC: UIViewController, MKMapViewDelegate {
         
         let annotation = MKPointAnnotation()
         annotation.coordinate = locationCoordinate
-        
-        print("Latitude is: \(locationCoordinate.latitude.description) and longitude is: \(locationCoordinate.longitude.description)")
-        
+  
         mapView.addAnnotation(annotation)
         
         let pin = Pin(context: dataController.viewContext)
@@ -167,7 +154,6 @@ class TravelLocationsMapVC: UIViewController, MKMapViewDelegate {
         
         try? dataController.viewContext.save()
         
-        
         annotations.append(annotation)
     }
     
@@ -175,9 +161,8 @@ class TravelLocationsMapVC: UIViewController, MKMapViewDelegate {
         let pin = Pin(context: dataController.viewContext)
         pin.latitude = latitude
         pin.longitude = longitude
-        
+    
         try? dataController.viewContext.save()
-        
     }
     
     func getAnnotationsFromPinArray(){
@@ -189,18 +174,15 @@ class TravelLocationsMapVC: UIViewController, MKMapViewDelegate {
             let annotation = MKPointAnnotation()
             annotation.coordinate = coordinate
             
-            
             DispatchQueue.main.async {
                 self.mapView.addAnnotation(annotation)
             }
         }
-        
     }
     
     @IBAction func editTapped(_ sender: Any) {
         hideEditButton()
         deletePinstext.isHidden = false
-        
         doneButton.title = "Done"
         doneButton.isEnabled = true
     }
@@ -221,5 +203,5 @@ class TravelLocationsMapVC: UIViewController, MKMapViewDelegate {
         editButton.title = ""
         editButton.isEnabled = false
     }
-
+    
 }

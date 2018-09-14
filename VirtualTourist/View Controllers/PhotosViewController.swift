@@ -11,9 +11,6 @@ import UIKit
 import MapKit
 import CoreData
 
-
-
-
 class PhotosViewController: UIViewController, UICollectionViewDataSource, UICollectionViewDelegate, MKMapViewDelegate {
     
     @IBOutlet weak var newCollectionButton: UIButton!
@@ -24,21 +21,21 @@ class PhotosViewController: UIViewController, UICollectionViewDataSource, UIColl
     var latitude: NSString?
     var longitude: NSString?
     var pin: Pin!
-    var thumbnailImages: [PhotoThumbnail]?
-    var thumbnailUIImages: [UIImage] = []
-    
     
     var fetchedResultsController: NSFetchedResultsController<PhotoThumbnail>!
+    
     var dataController: DataController!
     fileprivate let reuseIdentifier = "FlickrCell"
     fileprivate let sectionInsets = UIEdgeInsets(top: 5.0, left: 5.0, bottom: 10.0, right: 10.0)
-    fileprivate var searchResults = [FlickrSearchResults]()
+    
     fileprivate var flickrAPIDataLoaded = false
     fileprivate var flickrAPIPageNumber: Int = 1
     fileprivate let flickr = FlickrClient()
     fileprivate let itemsPerRow: CGFloat = 3
+    var thumbnailImages: [UIImage]?
     var selectedCell = [IndexPath]()
     var numberOfPhotoObjects: Int = 0
+    var collectionSize = 21
     
     
     override func viewDidLoad() {
@@ -61,9 +58,7 @@ class PhotosViewController: UIViewController, UICollectionViewDataSource, UIColl
         let regionRadius: CLLocationDistance = 2000
         let coordinateRegion = MKCoordinateRegionMakeWithDistance(coordinate, regionRadius * 2.0, regionRadius * 2.0)
         
-        print("Does this pin have photos attached, count: \(String(describing:  self.numberOfPhotoObjects))")
-        //print("Collection view cell bounds: \(photoCollectionView)")
-        
+        setupFetchedResultsController()
         
         if ((self.pin.photos?.anyObject()) != nil) {
             if (((self.pin.photos?.count)!) == 0) {
@@ -71,19 +66,31 @@ class PhotosViewController: UIViewController, UICollectionViewDataSource, UIColl
                     self.noImages.isHidden = false
                     self.newCollectionButton.isEnabled = false
                 }
-            } else {
-                print("Calling core data")
-                fetchThumbnailsCoreData()
             }
-        } else {
-            print("Calling FLickr")
-            fetchFlickrPhotos()
         }
-        //fetchFlickrPhotos()
         
         DispatchQueue.main.async {
             self.miniMapView.addAnnotation(annotation)
             self.miniMapView.setRegion(coordinateRegion, animated: false)
+        }
+        
+    }
+    
+    func setupFetchedResultsController() {
+        let fetchRequest:NSFetchRequest<PhotoThumbnail> = PhotoThumbnail.fetchRequest()
+        let predicate = NSPredicate(format: "pin == %@", pin)
+        fetchRequest.predicate = predicate
+        let sortDescriptor = NSSortDescriptor(key: "creationDate", ascending: false)
+        fetchRequest.sortDescriptors = [sortDescriptor]
+        
+        fetchedResultsController = NSFetchedResultsController(fetchRequest: fetchRequest, managedObjectContext: dataController.viewContext, sectionNameKeyPath: nil, cacheName: nil)
+        
+        fetchedResultsController.delegate = self
+        
+        do {
+            try? fetchedResultsController.performFetch()
+        } catch {
+            fatalError("The fetch could not be performed: \(error.localizedDescription)")
         }
         
     }
@@ -100,17 +107,24 @@ class PhotosViewController: UIViewController, UICollectionViewDataSource, UIColl
     
     override func viewWillAppear(_ animated: Bool) {
         self.flickrAPIPageNumber = 1
-        
+    }
+    
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewWillAppear(true)
+    }
+    
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(true)
+        fetchedResultsController = nil
     }
     
     func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
         if annotation is MKUserLocation {return nil}
-        
         var annotationView = mapView.dequeueReusableAnnotationView(withIdentifier: reuseIdentifier) as? MKPinAnnotationView
+        
         if annotationView == nil {
             annotationView = MKPinAnnotationView(annotation: annotation, reuseIdentifier: reuseIdentifier)
             annotationView?.canShowCallout = false
-            
         } else {
             annotationView?.annotation = annotation
         }
@@ -118,53 +132,51 @@ class PhotosViewController: UIViewController, UICollectionViewDataSource, UIColl
     }
     
     func numberOfSections(in collectionView: UICollectionView) -> Int {
-        if ((self.pin.photos?.anyObject()) != nil) {
-            return 1
-        } else{
-            print("Number of sections is: \(searchResults.count)")
-            return searchResults.count
-        }
+        return 1
     }
     
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-        if ((self.pin.photos?.anyObject()) != nil) {
-            return thumbnailUIImages.count
-        } else{
-            return searchResults[section].searchResults.count
+        if fetchedResultsController.sections?[0].numberOfObjects == 0 {
+            return collectionSize
+        } else {
+            collectionSize = (fetchedResultsController.sections?[0].numberOfObjects)!
+            return collectionSize
         }
     }
-    
-    
     
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         let cell = collectionView.dequeueReusableCell(withReuseIdentifier: reuseIdentifier, for: indexPath) as! FlickrPhotoCell
         
+        cell.backgroundColor = UIColor.darkGray
         
-        
-        
-        if ((self.pin.photos?.anyObject()) != nil) {
+        if indexPath.row >= (fetchedResultsController.fetchedObjects?.count)! {
+            cell.imageView.image = nil
+            cell.activityIndicator.startAnimating()
             
-            cell.activityIndicator.stopAnimating()
-            let thumbailImage = thumbnailUIImages[indexPath.item]
-            cell.backgroundColor = UIColor.white
-            cell.imageView.image = thumbailImage
-        }
-        
-        else {
-            print("Inside else")
+            FlickrClient.searchForPhotosWithLatLong(latitude: (self.latitude?.doubleValue)!, longitude: (self.longitude?.doubleValue)!) { (foundImage, image) in
+                self.thumbnailImages?.append(image)
+                if foundImage {
+                    DispatchQueue.main.async {
+                        cell.imageView.image = image
+                        cell.activityIndicator.stopAnimating()
+                        let photo = PhotoThumbnail(context: self.dataController.viewContext)
+                        
+                        let imageData: Data? = UIImagePNGRepresentation(image)
+                        photo.imageData = imageData
+                        photo.creationDate = Date()
+                        photo.pin = self.pin
+                        
+                        try? self.dataController.viewContext.save()
+                    }
+                }
+            }
             
-            let flickrPhoto = photoForIndexPath(indexPath: indexPath)
-            cell.backgroundColor = UIColor.white
-            cell.imageView.image = flickrPhoto.thumbnail
-            cell.activityIndicator.stopAnimating()
-//            cell.activityIndicator.startAnimating()
-//            thumbnailUIImages.removeAll()
-//            self.newCollectionButton.isEnabled = false
-//
+        } else {
+            let coreDataImage = fetchedResultsController.object(at: indexPath)
+            cell.imageView.image = UIImage(data: coreDataImage.imageData!)
         }
         return cell
     }
-    
     
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         let _ = collectionView.dequeueReusableCell(withReuseIdentifier: reuseIdentifier, for: indexPath) as! FlickrPhotoCell
@@ -186,119 +198,6 @@ class PhotosViewController: UIViewController, UICollectionViewDataSource, UIColl
         }
     }
     
-    func saveThumbnailsToCoreData() {
-        let imagesResults = self.searchResults[0].searchResults
-        var thumbnails: [UIImage] = []
-        
-        for imageResult in imagesResults {
-            thumbnails.append(imageResult.thumbnail!)
-            thumbnailUIImages.append(imageResult.thumbnail!)
-            
-            guard let thumbnailData = UIImageJPEGRepresentation(imageResult.thumbnail!, 1) else {
-                print("JPG error")
-                return
-            }
-            
-            
-            let thumbnailForPin = PhotoThumbnail(context: dataController.viewContext)
-            thumbnailForPin.imageData = thumbnailData
-            thumbnailForPin.pin = pin
-        }
-        try? dataController.viewContext.save()
-        print("Number of images to save is: \(thumbnails.count)")
-    }
-    
-    func fetchThumbnailsCoreData() {
-        let fetchRequest:NSFetchRequest<PhotoThumbnail> = PhotoThumbnail.fetchRequest()
-        let predicate = NSPredicate(format: "pin == %@", pin)
-        fetchRequest.predicate = predicate
-        
-        if let result = try? dataController.viewContext.fetch(fetchRequest) {
-            thumbnailImages = result
-        }
-        print("From core data get thumbnails: \(String(describing: thumbnailImages?.count))")
-        
-        for thumbnailImage in thumbnailImages! {
-            if let image = UIImage(data: thumbnailImage.imageData!) {
-                thumbnailUIImages.append(image)
-            }
-        }
-        
-        print("UI Images count: \(String(describing: thumbnailUIImages.count))")
-        DispatchQueue.main.async {
-            self.photoCollectionView.reloadData()
-            self.newCollectionButton.isEnabled = true
-        }
-    }
-    
-    func fetchFlickrPhotos() {
-        thumbnailUIImages.removeAll()
-        let spinnerView = UIViewController.displaySpinner(onView: self.view)
-        self.newCollectionButton.isEnabled = false
-        print("Page number is: \(self.flickrAPIPageNumber)")
-        FlickrClient.sharedInstance.searchPhotos(self.flickrAPIPageNumber, latitude: (self.latitude?.doubleValue)!, longitude: (self.longitude?.doubleValue)!) { results, error in
-            
-            UIViewController.removeSpinner(spinner: spinnerView)
-            //self.flickrAPIDataLoaded = true
-            
-            if let error = error {
-                print(error)
-                if error.localizedDescription == "The device is not connected to the internet." {
-                    self.displayAlert(alertTitle: "Check Internet connection", alertMesssage: "The device is not connected to the internet.")
-                }
-                return
-            }
-            
-            if let results = results {
-                print("Found \(results.searchResults.count)")
-                
-                if (results.searchResults.count == 0) {
-                    
-                    DispatchQueue.main.async {
-                        self.noImages.isHidden = false
-                        self.newCollectionButton.isEnabled = false
-                    }
-                    return
-                } else {
-                    self.searchResults.insert(results, at: 0)
-                    self.flickrAPIDataLoaded = true
-                    self.saveThumbnailsToCoreData()
-                }
-                
-                
-            }
-            DispatchQueue.main.async {
-                self.photoCollectionView.reloadData()
-                self.newCollectionButton.isEnabled = true
-                
-            }
-            
-        }
-    }
-    
-    func deletePhotosFromCoreData(){
-        if ((self.pin.photos?.anyObject()) != nil) {
-            
-            var thumbnailImagesDel: [PhotoThumbnail]?
-            
-            let fetchRequest:NSFetchRequest<PhotoThumbnail> = PhotoThumbnail.fetchRequest()
-            let predicate = NSPredicate(format: "pin == %@", pin)
-            fetchRequest.predicate = predicate
-            
-            if let result = try? dataController.viewContext.fetch(fetchRequest) {
-                thumbnailImagesDel = result
-            }
-            print("For new collection, from core data delete all existing thumbnails: \(String(describing: thumbnailImagesDel?.count))")
-            thumbnailUIImages.removeAll()
-            
-            for thumbnailToDelete in thumbnailImagesDel! {
-                dataController.viewContext.delete(thumbnailToDelete)
-            }
-            try? dataController.viewContext.save()
-            self.photoCollectionView.reloadData()
-        }
-    }
-    
     func checkSelectedCellsCount() {
         if let selectedItemPaths = photoCollectionView.indexPathsForSelectedItems {
             if selectedItemPaths.count > 0 {
@@ -313,7 +212,6 @@ class PhotosViewController: UIViewController, UICollectionViewDataSource, UIColl
         }
     }
     
-    
     @IBAction func okButtonTapped(_ sender: Any) {
         self.dismiss(animated: true)
     }
@@ -325,20 +223,6 @@ class PhotosViewController: UIViewController, UICollectionViewDataSource, UIColl
             if ((self.pin.photos?.anyObject()) != nil) {
                 //Remove selected pictures from core data
                 if let selectedItemPaths = photoCollectionView.indexPathsForSelectedItems {
-                    
-                    var thumbnailImagesDel: [PhotoThumbnail]?
-                    
-                    let fetchRequest:NSFetchRequest<PhotoThumbnail> = PhotoThumbnail.fetchRequest()
-                    let predicate = NSPredicate(format: "pin == %@", pin)
-                    fetchRequest.predicate = predicate
-                    
-                    if let result = try? dataController.viewContext.fetch(fetchRequest) {
-                        thumbnailImagesDel = result
-                    }
-                    print("For deletion from core data get thumbnails: \(String(describing: thumbnailImagesDel?.count))")
-                    
-                    
-                    
                     var indexesToRemove: [IndexPath] = []
                     for indexPath in selectedItemPaths {
                         indexesToRemove.append(indexPath)
@@ -349,77 +233,50 @@ class PhotosViewController: UIViewController, UICollectionViewDataSource, UIColl
                     
                     if selectedItemPaths.count > 0 {
                         if selectedItemPaths.count == self.photoCollectionView.numberOfItems(inSection: 0) {
-                            print("Deleting all photos in section")
-                            thumbnailUIImages.removeAll()
-                            deletePhotosFromCoreData()
-                            //self.photoCollectionView.reloadItems(at: selectedItemPaths)
-                            self.photoCollectionView.reloadData()
+                            if let numberPhotosToDelete = fetchedResultsController.fetchedObjects?.count {
+                                for num in 0...numberPhotosToDelete-1 {
+                                    let photoToDelete = fetchedResultsController.object(at: IndexPath(row: num, section: 0))
+                                    dataController.viewContext.delete(photoToDelete)
+                                }
+                                
+                                try? dataController.viewContext.save()
+                                self.thumbnailImages?.removeAll()
+                                collectionSize = 21
+                                photoCollectionView.reloadData()
+                            }
                         }
                         else {
-                            print("If number of items is greater than zero")
-                            print("Number of indexes to remove: \(reversedIndexesToRemove.count)")
                             for index in reversedIndexesToRemove {
-                                print("Number of items is in thumbnailsUI: \(thumbnailUIImages.count) an index to remove is: \(index)")
-                                thumbnailUIImages.remove(at: index.item)
-                                print("Core Data thumbnails count is: \(String(describing: thumbnailImagesDel?.count)) and index to delete is: \(index.item)")
-                                let photoForDel = thumbnailImagesDel?[index.item]
-                                thumbnailImagesDel?.remove(at: index.item)
+                                let photoForDel = fetchedResultsController.object(at: IndexPath(row: index.row, section: 0))
+                                thumbnailImages?.remove(at: index.row)
                                 
-                                dataController.viewContext.delete(photoForDel!)
+                                dataController.viewContext.delete(photoForDel)
                             }
                             try? dataController.viewContext.save()
                             self.photoCollectionView.deleteItems(at: indexesToRemove)
                         }
                     }
                     
-                    
-                }
-                
-            } else {
-                if let selectedItemPaths = photoCollectionView.indexPathsForSelectedItems {
-                    
-                    var indexesToRemove: [IndexPath] = []
-                    for indexPath in selectedItemPaths {
-                        indexesToRemove.append(indexPath)
-                    }
-                    
-                    indexesToRemove.sort()
-                    
-                    let reversedIndexesToRemove = Array(indexesToRemove.reversed())
-                    
-                    if selectedItemPaths.count > 0 {
-                        for index in reversedIndexesToRemove {
-                            let photoToRemove = photoForIndexPath(indexPath: index)
-                            
-                            let filteredResults = searchResults[(index as NSIndexPath).section].searchResults.filter( {
-                                $0 != photoToRemove
-                            })
-                            self.searchResults.removeAll()
-                            
-                            var flickrPhotos = [FlickrPhoto]()
-                            for flickrPhoto in filteredResults {
-                                flickrPhotos.append(flickrPhoto)
-                            }
-                            self.searchResults.insert(FlickrSearchResults(searchResults: flickrPhotos), at: 0)
-                        }
-                    }
-                    self.photoCollectionView.deleteItems(at: indexesToRemove)
                 }
             }
-            
             
             DispatchQueue.main.async {
                 self.newCollectionButton.setTitle("New Collection", for: UIControlState.normal)
             }
-            
         }
             //New Collection
         else {
-            self.flickrAPIPageNumber += 1
-            deletePhotosFromCoreData()
-            self.searchResults.removeAll()
-            fetchFlickrPhotos()
-            // saveThumbnailsToCoreData()
+            if let numberPhotosToDelete = fetchedResultsController.fetchedObjects?.count {
+                for num in 0...numberPhotosToDelete-1 {
+                    let photoToDelete = fetchedResultsController.object(at: IndexPath(row: num, section: 0))
+                    dataController.viewContext.delete(photoToDelete)
+                }
+                
+                try? dataController.viewContext.save()
+                self.thumbnailImages?.removeAll()
+                collectionSize = 21
+                photoCollectionView.reloadData()
+            }
         }
     }
 }
@@ -454,9 +311,27 @@ extension PhotosViewController: UICollectionViewDelegateFlowLayout {
 }
 
 
-private extension PhotosViewController {
-    func photoForIndexPath (indexPath: IndexPath) -> FlickrPhoto{
-        return searchResults[(indexPath as NSIndexPath).section].searchResults[(indexPath as IndexPath).row]
+extension PhotosViewController: NSFetchedResultsControllerDelegate {
+    
+    func controllerWillChangeContent(_ controller: NSFetchedResultsController<NSFetchRequestResult>) {
+    }
+    
+    func controllerDidChangeContent(_ controller: NSFetchedResultsController<NSFetchRequestResult>) {
+    }
+    
+    func controller(_ controller: NSFetchedResultsController<NSFetchRequestResult>, didChange anObject: Any, at indexPath: IndexPath?, for type: NSFetchedResultsChangeType, newIndexPath: IndexPath?) {
+        switch type {
+        case .insert:
+            break
+        case .delete:
+            break
+        case .update:
+            break
+        case .move:
+            break
+        default:
+            break
+        }
     }
 }
 
